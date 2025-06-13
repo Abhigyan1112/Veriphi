@@ -1,4 +1,4 @@
-from flask import Flask
+from flask import Flask, url_for
 import numpy as np
 from mongoengine import connect, Document, StringField, IntField
 from flask import redirect, render_template, request, jsonify
@@ -33,16 +33,18 @@ class Image(db.Model):
 
 @app.route("/")
 def main():
-    return render_template("index.html")
+    all_bookings = db.session.query(Image.booking_id).distinct().all()
+    booking_id=request.args.get('booking_id')
+    return render_template("index.html",all_bookings=all_bookings,dropdown_placeholder=booking_id or "Drop Down")
 
 @app.route("/image-processing",methods=['POST'])
 def image_processing():
     booking_id=request.form['bookingID']
     image=request.files['image'].read()
+
     try:
         if image is None:
             return jsonify({'error': 'Failed to load image with OpenCV. Check format.'}), 400
-
         detector = dlib.get_frontal_face_detector()
         predictor = dlib.shape_predictor("static/shape_predictor_68_face_landmarks.dat")
 
@@ -52,16 +54,12 @@ def image_processing():
 
         if len(face) == 0:
             return jsonify({
-                'file_name': image,
-                'status': 'Cannot detect any faces in the image'
+                'status': 'Cannot detect any faces in the image or the face is not frontal'
             }), 400
-
         if len(face) > 1:
             return jsonify({
-                'file_name': image,
                 'status': 'Multiple faces in the image'
             }), 400
-
         landmarks = predictor(rgb, face[0])
         points = [(landmarks.part(n).x, landmarks.part(n).y) for n in range(68)]
 
@@ -78,18 +76,21 @@ def image_processing():
 
         if symmetry_ratio > 1.5:
             return jsonify({
-                'file_name': image,
                 'status': 'The image is not frontal',
                 'symmetry_ratio': symmetry_ratio
             }), 400
-
         img=Image(booking_id=booking_id,image=image)
         db.session.add(img)
         db.session.commit()
-        return render_template('index.html')
+        return redirect(url_for('main'))
 
     except Exception as e:
         return jsonify({'error Exception': str(e)}), 500
+
+@app.route("/dropdown/<string:booking_id>",methods=['GET'])
+def dropdown(booking_id):
+    return redirect(url_for("main",booking_id=booking_id))
+
 
 # @app.route("/entry",methods=['GET','POST'])
 # def entry():
