@@ -1,16 +1,19 @@
+from xmlrpc.client import Binary
+
 from flask import Flask, url_for
 import numpy as np
-from mongoengine import connect, Document, StringField, IntField
-from flask import redirect, render_template, request, jsonify
+from httpx._multipart import FileField
+from mongoengine import connect, Document, StringField, IntField, FileField
+from flask import redirect, render_template, request, jsonify, flash, get_flashed_messages
 from flask_sqlalchemy import SQLAlchemy
-from flask_toastr import Toastr
 import cv2
 import dlib
 
 app=Flask(__name__)
+app.secret_key = 'aditi18'
 app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///bookings.db'
 db=SQLAlchemy(app)
-toastr=Toastr(app)
+
 
 class Image(db.Model):
     booking_id=db.Column(db.String(200),nullable=False)
@@ -20,27 +23,38 @@ class Image(db.Model):
     def __repr__(self) -> str:
         return f'{self.booking_id} - {self.image_id}'
 
-# #Connecting to the MongoDB database 'trial_database' with connection string
-# connect(
-#     db='trial_database',
-#     host='mongodb+srv://Abhigyan:%40Saransh16@user-images.48yzbzo.mongodb.net/'
-# )
+#Connecting to the MongoDB database 'trial_database' with connection string
+connect(
+    db='trial_database',
+    host='mongodb+srv://Abhigyan:%40Saransh16@user-images.48yzbzo.mongodb.net/'
+)
 
- # class Image(Document):
- #     bookingID=StringField(required=True)
- #     imageID=IntField(required=True)
- #     image=FileField(required=True)
+class Entry(Document):
+     bookingID=StringField(required=True)
+     imageID=IntField(required=True)
+     image=FileField(required=True)
 
 @app.route("/")
 def main():
-    all_bookings = db.session.query(Image.booking_id).distinct().all()
+    try:
+        all_bookings = db.session.query(Image.booking_id).distinct().all()
+    except Exception as e:
+        db.session.rollback()
+        flash(str(e), 'error')
     booking_id=request.args.get('booking_id')
-    return render_template("index.html",all_bookings=all_bookings,dropdown_placeholder=booking_id or "Drop Down")
+    messages=get_flashed_messages(with_categories=True)
+    return render_template("index.html",all_bookings=all_bookings,dropdown_placeholder=booking_id or "Drop Down", messages=messages)
 
 @app.route("/image-processing",methods=['POST'])
 def image_processing():
-    booking_id=request.form['bookingID']
-    image=request.files['image'].read()
+    try:
+        booking_id=request.form['bookingID']
+    except Exception:
+        flash("bookingID not provided","error")
+    image = request.files['image'].read()
+    if image not in request.files or request.files[image].filename=='':
+        flash("No file selected","error")
+        return redirect(url_for("main"))
 
     try:
         if image is None:
@@ -91,24 +105,32 @@ def image_processing():
 def dropdown(booking_id):
     return redirect(url_for("main",booking_id=booking_id))
 
+@app.route("/entry/<string:booking_id>",methods=['GET'])
+def entry(booking_id):
+    if booking_id == "Drop Down":
+        flash("select a booking id","error")
+        return redirect(url_for("main"))
+    images=Image.query.filter(Image.booking_id==booking_id).all()
+    if not images:
+        flash("No images found for the selected bookingID","error")
+        return redirect(url_for("main"))
+    for img in images:
+        mongo_image=Entry(bookingID=booking_id,image=img.image,imageID=img.image_id)
+        try:
+            mongo_image.save()
+            db.session.delete(img)
+            db.session.commit()
+        except Exception as e:
+            db.session.rollback()
+            flash(str(e), 'error')
+    return redirect(url_for('main'))
 
-# @app.route("/entry",methods=['GET','POST'])
-# def entry():
-#     if request.method=='POST':
-#         name=request.form['name']
-#         age=request.form['age']
-#         email=request.form['email']
-#         entry=Entry(name=name,age=age,email=email)
-#         entry.save()
-#         return f"<h3>Entry Added! ID:{entry.id}</h3> <a href='/entry'>Add Another?</a>"
-    
-# #   GET request to return a form
-#     return render_template('index.html')
+#   GET request to return a form
 
-# @app.route("/show",methods=['GET'])
-# def show():
-#     users = Entry.objects().to_json()
-#     return users, 200
+@app.route("/show",methods=['GET'])
+def show():
+    users = Entry.objects().to_json()
+    return users, 200
 
 if __name__ == "__main__":
     app.run(debug=True,port=3000)
