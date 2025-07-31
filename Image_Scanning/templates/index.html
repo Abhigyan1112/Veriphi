@@ -10,15 +10,17 @@
     <script src="https://cdnjs.cloudflare.com/ajax/libs/toastr.js/latest/toastr.min.js"></script>
 
     <script>
-    $(document).ready(function () {
-        {% for category, message in messages %}
+        $(document).ready(function () {
+            // Set toastr options once
             toastr.options = {
                 "closeButton": true,
                 "progressBar": true
             };
-            toastr["{{ category }}"]("{{ message }}");
-        {% endfor %}
-    });
+            
+            {% for category, message in messages %}
+                toastr["{{ category|e }}"]("{{ message|e }}");
+            {% endfor %}
+        });
     </script>
 
     <style>

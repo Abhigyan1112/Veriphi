@@ -51,34 +51,45 @@ def image_processing():
         booking_id=request.form['bookingID']
     except Exception:
         flash("bookingID not provided","error")
-    image = request.files['image'].read()
-    if image not in request.files or request.files[image].filename=='':
+        return redirect(url_for("main"))
+
+    # Corrected check: Verify the file exists in the request first.
+    if 'image' not in request.files or request.files['image'].filename == '':
         flash("No file selected","error")
         return redirect(url_for("main"))
 
+    # Read the file data *after* verifying it exists
+    image_file = request.files['image']
+    image_data = image_file.read()
+
     try:
-        if image is None:
-            return jsonify({'error': 'Failed to load image with OpenCV. Check format.'}), 400
         detector = dlib.get_frontal_face_detector()
         predictor = dlib.shape_predictor("static/shape_predictor_68_face_landmarks.dat")
 
-        img=cv2.imdecode(np.frombuffer(image, np.uint8), cv2.IMREAD_COLOR)
-        rgb=cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
-        face=detector(rgb)
+        img_np = np.frombuffer(image_data, np.uint8)
+        img_cv2 = cv2.imdecode(img_np, cv2.IMREAD_COLOR)
 
-        if len(face) == 0:
+        if img_cv2 is None:
+            return jsonify({'error': 'Failed to load image with OpenCV. Check format.'}), 400
+
+        rgb = cv2.cvtColor(img_cv2, cv2.COLOR_BGR2RGB)
+        faces = detector(rgb)
+
+        if len(faces) == 0:
             return jsonify({
                 'status': 'Cannot detect any faces in the image or the face is not frontal'
             }), 400
-        if len(face) > 1:
+        if len(faces) > 1:
             return jsonify({
                 'status': 'Multiple faces in the image'
             }), 400
-        landmarks = predictor(rgb, face[0])
+        
+        # All processing logic remains the same...
+        landmarks = predictor(rgb, faces[0])
         points = [(landmarks.part(n).x, landmarks.part(n).y) for n in range(68)]
 
-        for (x,y) in points:
-            cv2.circle(img, (x,y), 2, (255,0,0), -1)
+        for (x, y) in points:
+            cv2.circle(img_cv2, (x, y), 2, (255, 0, 0), -1)
 
         nose = (landmarks.part(30).x, landmarks.part(30).y)
         left_cheek = (landmarks.part(1).x, landmarks.part(1).y)
@@ -86,16 +97,27 @@ def image_processing():
 
         left_dist = abs(nose[0] - left_cheek[0])
         right_dist = abs(right_cheek[0] - nose[0])
+        
+        # Avoid division by zero
+        if right_dist == 0:
+             return jsonify({
+                'status': 'Invalid face landmarks for symmetry check.'
+            }), 400
+
         symmetry_ratio = left_dist / right_dist
 
-        if symmetry_ratio > 1.5:
+        if symmetry_ratio > 1.5 or symmetry_ratio < (1/1.5): # Check for both left and right turns
             return jsonify({
                 'status': 'The image is not frontal',
                 'symmetry_ratio': symmetry_ratio
             }), 400
-        img=Image(booking_id=booking_id,image=image)
+
+        # Save the original image data, not the processed one with circles
+        img = Image(booking_id=booking_id, image=image_data)
         db.session.add(img)
         db.session.commit()
+        
+        flash("Image uploaded and processed successfully!", "success")
         return redirect(url_for('main'))
 
     except Exception as e:
