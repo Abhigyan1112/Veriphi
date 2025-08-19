@@ -18,20 +18,22 @@ db=SQLAlchemy(app)
 class Image(db.Model):
     booking_id=db.Column(db.String(200),nullable=False)
     image_id=db.Column(db.Integer,primary_key=True,autoincrement=True)
+    name=db.Column(db.String(200),nullable=False)
     image=db.Column(db.LargeBinary,nullable=False)
 
     def __repr__(self) -> str:
-        return f'{self.booking_id} - {self.image_id}'
+        return f'{self.booking_id} - {self.image_id} - {self.name}'
 
 #Connecting to the MongoDB database 'trial_database' with connection string
 connect(
-    db='trial_database',
-    host='mongodb+srv://Abhigyan:%40Saransh16@user-images.48yzbzo.mongodb.net/'
+    db='attendees_images',
+    host='mongodb+srv://Abhigyan1112:veriphi123@verphi.mk8m4jf.mongodb.net/'
 )
 
 class Entry(Document):
      bookingID=StringField(required=True)
      imageID=IntField(required=True)
+     name=StringField(required=True)
      image=FileField(required=True)
 
 @app.route("/")
@@ -49,8 +51,9 @@ def main():
 def image_processing():
     try:
         booking_id=request.form['bookingID']
+        name=request.form['name']
     except Exception:
-        flash("bookingID not provided","error")
+        flash("bookingID or Name not provided","error")
         return redirect(url_for("main"))
 
     # Corrected check: Verify the file exists in the request first.
@@ -113,7 +116,7 @@ def image_processing():
             }), 400
 
         # Save the original image data, not the processed one with circles
-        img = Image(booking_id=booking_id, image=image_data)
+        img = Image(booking_id=booking_id, name=name, image=image_data)
         db.session.add(img)
         db.session.commit()
         
@@ -137,7 +140,7 @@ def entry(booking_id):
         flash("No images found for the selected bookingID","error")
         return redirect(url_for("main"))
     for img in images:
-        mongo_image=Entry(bookingID=booking_id,image=img.image,imageID=img.image_id)
+        mongo_image=Entry(bookingID=booking_id,name=img.name,image=img.image,imageID=img.image_id)
         try:
             mongo_image.save()
             db.session.delete(img)
