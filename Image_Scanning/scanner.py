@@ -2,33 +2,44 @@ from xmlrpc.client import Binary
 
 from flask import Flask, url_for
 import numpy as np
+import io
 from httpx._multipart import FileField
-from mongoengine import connect, Document, StringField, IntField, FileField
+from mongoengine import connect, disconnect, Document, StringField, IntField, FileField
 from flask import redirect, render_template, request, jsonify, get_flashed_messages
 import cv2
 import dlib
+import qrcode
+from pyzbar.pyzbar import decode
 
 app=Flask(__name__)
 
-#Connecting to the MongoDB database 'trial_database' with connection string
-connect(
-    db='attendees_images',
-    host='mongodb+srv://Abhigyan1112:veriphi123@verphi.mk8m4jf.mongodb.net/'
-)
-
 class Entry(Document):
-     bookingID=StringField(required=True)
-     imageID=IntField(required=True)
-     name=StringField(required=True)
-     image=FileField(required=True)
+    bookingID=StringField(required=True)
+    imageID=IntField(required=True)
+    name=StringField(required=True)
+    image=FileField(required=True)
+
+class ticketID_person(Document):
+    ticketID = StringField(required=True, unique=True)   # use ticketID instead of bookingID
+    name = StringField(required=True)
+    image = FileField(required=True)
+    qr = FileField(required=True)
+
 
 @app.route("/")
 def main():
-    booking_id=request.args.get('booking_id')
-    messages=get_flashed_messages(with_categories=True)
-    return render_template("index.html",dropdown_placeholder=booking_id or "Drop Down", messages=messages)
+    return render_template("index.html")
 
-@app.route("/image-processing", methods=['POST'])
+
+
+
+
+
+
+
+
+
+@app.route("/frontal_check", methods=['POST'])
 def image_processing():
     # Ensure file exists in request
     if 'image' not in request.files or request.files['image'].filename == '':
@@ -102,6 +113,94 @@ def image_processing():
             "status": "error",
             "message": str(e)
         }), 500
+
+
+
+
+
+
+
+
+
+
+@app.route("/upload_images", methods=['POST'])
+def upload_images():
+    #Connecting to the MongoDB database 'attendees_images' with connection string
+    connect(
+        db='attendees_images',
+        host='mongodb+srv://Abhigyan1112:veriphi123@verphi.mk8m4jf.mongodb.net/'
+    )
+    bookingID = "Dummy"
+    # get booking ID from springBoot and List of images from flutter and upload to mongoDB.
+
+
+
+
+
+
+
+
+
+
+
+@app.route("/qr_generation", methods=['POST'])
+def QR_generation():
+    try:
+        data = request.get_json()
+        bookingID = data.get("bookingID")
+        ticketIDs = data.get("ticketIDs") 
+
+        if not bookingID or not ticketIDs:
+            return jsonify({
+                "status": "error",
+                "message": "bookingID and ticketIDs are required"
+            }), 400
+
+        connect(
+            db='attendees_images',
+            host='mongodb+srv://Abhigyan1112:veriphi123@verphi.mk8m4jf.mongodb.net/'
+        )
+
+        attendees_for_bookingID = list(Entry.objects(bookingID=bookingID))
+        disconnect(alias='default')
+
+        # Connect to ticket IDs DB
+        connect(
+            db='ticket_IDs',
+            host='mongodb+srv://Abhigyan1112:veriphi123@verphi.mk8m4jf.mongodb.net/',
+        )
+
+        # Pair each attendee with corresponding ticketID
+        for attendee, ticketID in zip(attendees_for_bookingID, ticketIDs):
+
+            img = qrcode.make(ticketID)
+            img.save(f"{ticketID}-{bookingID}.png")
+            buffer = io.BytesIO()
+            img.save(buffer, format="PNG")
+            buffer.seek(0)
+
+            ticketID_entry = ticketID_person(
+                ticketID=ticketID,
+                name=attendee.name,
+                image=attendee.image,
+                qr = buffer.getvalue()
+            )
+            ticketID_entry.save()
+
+        disconnect(alias='default')
+
+        return jsonify({
+            "status": "success",
+            "message": f"QR generated for bookingID {bookingID}"
+        }), 200
+
+    except Exception as e:
+        return jsonify({
+            "status": "error",
+            "message": str(e)
+        }), 500
+
+
 
 
 if __name__ == "__main__":

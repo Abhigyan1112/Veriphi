@@ -50,7 +50,7 @@
           formData.append("image", blob, "snapshot.png"); // name = "image"
 
           // Send to Flask endpoint
-          fetch("http://127.0.0.1:3000/image-processing", {
+          fetch("http://127.0.0.1:3000/frontal_check", {
             // 👈 use full URL
             method: "POST",
             body: formData,
