@@ -122,16 +122,31 @@ def image_processing():
 
 
 
+# # set the Content-Type to multipart/form-data
+# @app.route("/upload_images", methods=['POST'])
+# def upload_images():
+#     #Connecting to the MongoDB database 'attendees_images' with connection string
+#     try:
+#         connect(
+#             db='attendees_images',
+#             host='mongodb+srv://Abhigyan1112:veriphi123@verphi.mk8m4jf.mongodb.net/'
+#         )
+#     except Exception:
+#         return jsonify({
+#                 "status": "error",
+#                 "message": "Cannot connect to the mongoDB server"
+#         }), 400
 
-@app.route("/upload_images", methods=['POST'])
-def upload_images():
-    #Connecting to the MongoDB database 'attendees_images' with connection string
-    connect(
-        db='attendees_images',
-        host='mongodb+srv://Abhigyan1112:veriphi123@verphi.mk8m4jf.mongodb.net/'
-    )
-    bookingID = "Dummy"
-    # get booking ID from springBoot and List of images from flutter and upload to mongoDB.
+#     try:
+#         bookingID = request.form['bookingID']
+#         names = request.form.getlist('names')
+#         images = request.files.getlist('images')
+#     except Exception:
+#         return jsonify({
+#             "status": "error",
+#             "message": "Missing required fields: bookingID, names, or images"
+#         }), 400
+
 
 
 
