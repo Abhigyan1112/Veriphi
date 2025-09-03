@@ -12,6 +12,7 @@ import qrcode
 from pyzbar.pyzbar import decode
 
 app=Flask(__name__)
+mongodb_uri = os.environ.get('MONGODB_URI')
 
 class Entry(Document):
     bookingID=StringField(required=True)
@@ -129,7 +130,7 @@ def upload_images():
     try:
         connect(
             db='attendees_images',
-            host='mongodb+srv://Abhigyan1112:veriphi123@verphi.mk8m4jf.mongodb.net/'
+            host=mongodb_uri
         )
     except Exception:
         return jsonify({
@@ -211,7 +212,7 @@ def QR_generation():
 
         connect(
             db='attendees_images',
-            host='mongodb+srv://Abhigyan1112:veriphi123@verphi.mk8m4jf.mongodb.net/'
+            host=mongodb_uri
         )
 
         attendees_for_bookingID = list(Entry.objects(bookingID=bookingID))
@@ -220,7 +221,7 @@ def QR_generation():
         # Connect to ticket IDs DB
         connect(
             db='ticket_IDs',
-            host='mongodb+srv://Abhigyan1112:veriphi123@verphi.mk8m4jf.mongodb.net/',
+            host=mongodb_uri
         )
 
         # Pair each attendee with corresponding ticketID

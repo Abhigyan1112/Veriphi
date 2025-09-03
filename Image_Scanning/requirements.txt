@@ -6,4 +6,3 @@ opencv-python
 dlib
 qrcode[pil]
 pyzbar
-gunicorn
