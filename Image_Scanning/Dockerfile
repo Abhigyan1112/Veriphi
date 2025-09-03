@@ -1,5 +1,5 @@
-# Use an official Python runtime as a parent image. python:3.9-slim is a good balance of size and compatibility.
-FROM python:3.9-slim
+# Use a more specific and stable Debian "Bullseye" base image
+FROM python:3.9-bullseye
 
 # Set environment variables to prevent Python from buffering stdout/stderr and to disable interactive prompts during package installation.
 ENV PYTHONUNBUFFERED=1 \

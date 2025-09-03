@@ -10,6 +10,7 @@ import cv2
 import dlib
 import qrcode
 from pyzbar.pyzbar import decode
+import os 
 
 app=Flask(__name__)
 mongodb_uri = os.environ.get('MONGODB_URI')
@@ -253,8 +254,3 @@ def QR_generation():
             "message": str(e)
         }), 500
 
-
-
-
-if __name__ == "__main__":
-    app.run(debug=True,port=3000)
