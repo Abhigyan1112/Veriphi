@@ -122,30 +122,68 @@ def image_processing():
 
 
 
-# # set the Content-Type to multipart/form-data
-# @app.route("/upload_images", methods=['POST'])
-# def upload_images():
-#     #Connecting to the MongoDB database 'attendees_images' with connection string
-#     try:
-#         connect(
-#             db='attendees_images',
-#             host='mongodb+srv://Abhigyan1112:veriphi123@verphi.mk8m4jf.mongodb.net/'
-#         )
-#     except Exception:
-#         return jsonify({
-#                 "status": "error",
-#                 "message": "Cannot connect to the mongoDB server"
-#         }), 400
+# set the Content-Type to multipart/form-data
+@app.route("/upload_images", methods=['POST'])
+def upload_images():
+    #Connecting to the MongoDB database 'attendees_images' with connection string
+    try:
+        connect(
+            db='attendees_images',
+            host='mongodb+srv://Abhigyan1112:veriphi123@verphi.mk8m4jf.mongodb.net/'
+        )
+    except Exception:
+        return jsonify({
+                "status": "error",
+                "message": "Cannot connect to the mongoDB server"
+        }), 400
 
-#     try:
-#         bookingID = request.form['bookingID']
-#         names = request.form.getlist('names')
-#         images = request.files.getlist('images')
-#     except Exception:
-#         return jsonify({
-#             "status": "error",
-#             "message": "Missing required fields: bookingID, names, or images"
-#         }), 400
+    try:
+        bookingID = request.form['bookingID']
+        names = request.form.getlist('names')
+        images = request.files.getlist('images')
+    except Exception:
+        return jsonify({
+            "status": "error",
+            "message": "Missing required fields: bookingID, names, or images"
+        }), 400
+
+    if len(names) != len(images):
+        return jsonify({
+            "status": "error",
+            "message": f"Mismatch: Received {len(names)} names and {len(images)} images. They must be equal."
+        }), 400
+        
+    if len(names) == 0:
+        return jsonify({"status": "error", "message": "No names or images received"}), 400
+
+    saved_entries = []
+    try:
+        for i, (name, image_file) in enumerate(zip(names, images)):
+            if image_file.filename == '':
+                continue 
+
+            entry = Entry(
+                bookingID=bookingID,
+                imageID=i + 1,
+                name=name
+            )
+            
+            entry.image.put(image_file.stream, content_type=image_file.content_type)
+            entry.save()
+            saved_entries.append(name)
+
+        return jsonify({
+            "status": "success",
+            "message": f"Successfully uploaded images for {len(saved_entries)} people under bookingID {bookingID}",
+            "bookingID": bookingID,
+            "names_processed": saved_entries
+        }), 201
+
+    except Exception as e:
+        print(f"An error occurred during upload: {e}") 
+        return jsonify({"status": "error", "message": str(e)}), 500
+
+
 
 
 
@@ -189,7 +227,6 @@ def QR_generation():
         for attendee, ticketID in zip(attendees_for_bookingID, ticketIDs):
 
             img = qrcode.make(ticketID)
-            img.save(f"{ticketID}-{bookingID}.png")
             buffer = io.BytesIO()
             img.save(buffer, format="PNG")
             buffer.seek(0)

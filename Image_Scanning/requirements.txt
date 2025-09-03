@@ -1,0 +1,9 @@
+
+Flask
+numpy
+mongoengine
+opencv-python
+dlib
+qrcode[pil]
+pyzbar
+gunicorn
