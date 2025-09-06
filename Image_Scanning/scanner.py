@@ -7,38 +7,22 @@ from httpx._multipart import FileField
 from mongoengine import connect, disconnect, Document, StringField, IntField, FileField
 from flask import redirect, render_template, request, jsonify, get_flashed_messages
 import cv2
-import dlib
+import mediapipe as mp
 import qrcode
 from pyzbar.pyzbar import decode
 import os 
-import requests
-import bz2
 
 
 app=Flask(__name__)
 mongodb_uri = os.environ.get('MONGODB_URI')
-DLIB_MODEL_URL = "http://dlib.net/files/shape_predictor_68_face_landmarks.dat.bz2"
-MODEL_DIR = "/tmp"  # Use a writable directory on the server
-MODEL_PATH = os.path.join(MODEL_DIR, "shape_predictor_68_face_landmarks.dat")
 
-def download_dlib_model():
-    """Downloads and decompresses the dlib model if it doesn't exist."""
-    if not os.path.exists(MODEL_PATH):
-        print("Dlib model not found. Downloading...")
-        os.makedirs(MODEL_DIR, exist_ok=True)
-        
-        # Download the compressed file
-        res = requests.get(DLIB_MODEL_URL, stream=True)
-        res.raise_for_status()
-        
-        # Decompress and write to file
-        decompressor = bz2.BZ2Decompressor()
-        with open(MODEL_PATH, "wb") as f:
-            for chunk in res.iter_content(chunk_size=8192):
-                f.write(decompressor.decompress(chunk))
-        print("Model downloaded and decompressed successfully.")
+face_detector = mp.solutions.face_detection.FaceDetection(
+    model_selection=1, min_detection_confidence=0.5
+)
 
-download_dlib_model()
+
+
+
 
 class Entry(Document):
     bookingID=StringField(required=True)
@@ -74,72 +58,34 @@ def image_processing():
 
     image_file = request.files['image']
     image_data = image_file.read()
+    
+    img_np = np.frombuffer(image_data, np.uint8)
+    img_cv2 = cv2.imdecode(img_np, cv2.IMREAD_COLOR)
 
+    if img_cv2 is None:
+        return jsonify({"status": "error", "message": "Failed to load image."}), 400
+    
     try:
-        detector = dlib.get_frontal_face_detector()
-        predictor = dlib.shape_predictor(MODEL_PATH)
+        # Convert the BGR image to RGB
+        rgb_image = cv2.cvtColor(img_cv2, cv2.COLOR_BGR_RGB)
+        
+        # Use the globally initialized face_detector
+        results = face_detector.process(rgb_image)
 
-        img_np = np.frombuffer(image_data, np.uint8)
-        img_cv2 = cv2.imdecode(img_np, cv2.IMREAD_COLOR)
-
-        if img_cv2 is None:
-            return jsonify({
-                "status": "error",
-                "message": "Failed to load image with OpenCV. Check format."
-            }), 400
-
-        rgb = cv2.cvtColor(img_cv2, cv2.COLOR_BGR2RGB)
-        faces = detector(rgb)
-
-        if len(faces) == 0:
-            return jsonify({
-                "status": "error",
-                "message": "No faces detected or face not frontal"
-            }), 400
-        if len(faces) > 1:
-            return jsonify({
-                "status": "error",
-                "message": "Multiple faces detected"
-            }), 400
-
-        # Extract landmarks
-        landmarks = predictor(rgb, faces[0])
-        points = [(landmarks.part(n).x, landmarks.part(n).y) for n in range(68)]
-
-        nose = (landmarks.part(30).x, landmarks.part(30).y)
-        left_cheek = (landmarks.part(1).x, landmarks.part(1).y)
-        right_cheek = (landmarks.part(15).x, landmarks.part(15).y)
-
-        left_dist = abs(nose[0] - left_cheek[0])
-        right_dist = abs(right_cheek[0] - nose[0])
-
-        if right_dist == 0:
-            return jsonify({
-                "status": "error",
-                "message": "Invalid face landmarks for symmetry check."
-            }), 400
-
-        symmetry_ratio = left_dist / right_dist
-
-        if symmetry_ratio > 1.5 or symmetry_ratio < (1/1.5):
-            return jsonify({
-                "status": "error",
-                "message": "Face is not frontal",
-                "symmetry_ratio": symmetry_ratio
-            }), 400
-
-        # ✅ Success response
+        if not results.detections:
+            return jsonify({"status": "error", "message": "No faces detected."}), 400
+        
+        if len(results.detections) > 1:
+            return jsonify({"status": "error", "message": "Multiple faces detected."}), 400
+        
         return jsonify({
             "status": "success",
-            "message": "Valid frontal face detected",
-            "symmetry_ratio": symmetry_ratio
+            "message": "Valid face detected"
         }), 200
-
+            
     except Exception as e:
-        return jsonify({
-            "status": "error",
-            "message": str(e)
-        }), 500
+        return jsonify({"status": "error", "message": str(e)}), 500
+
 
 
 

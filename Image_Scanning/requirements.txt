@@ -1,9 +1,9 @@
 
-Flask
+flask
 numpy
 mongoengine
 opencv-python-headless
-dlib
+mediapipe
 qrcode[pil]
 pyzbar
 gunicorn
