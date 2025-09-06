@@ -9,7 +9,10 @@ WORKDIR /app
 
 # Install system dependencies required by pyzbar
 # This command is crucial to fix the "Unable to find zbar shared library" error
-RUN apt-get update && apt-get install -y libzbar0 && rm -rf /var/lib/apt/lists/*
+RUN apt-get update && apt-get install -y \
+    libgl1-mesa-glx \
+    libzbar0 \
+    && rm -rf /var/lib/apt/lists/*
 
 # Copy the requirements file into the container
 COPY requirements.txt .
