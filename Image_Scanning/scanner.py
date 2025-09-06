@@ -14,6 +14,8 @@ import os
 from flask_cors import CORS
 
 
+print("--- SERVER RESTARTED WITH CORS ENABLED ---")
+
 app=Flask(__name__)
 CORS(app)
 mongodb_uri = os.environ.get('MONGODB_URI')
