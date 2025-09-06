@@ -11,9 +11,34 @@ import dlib
 import qrcode
 from pyzbar.pyzbar import decode
 import os 
+import requests
+import bz2
+
 
 app=Flask(__name__)
 mongodb_uri = os.environ.get('MONGODB_URI')
+DLIB_MODEL_URL = "http://dlib.net/files/shape_predictor_68_face_landmarks.dat.bz2"
+MODEL_DIR = "/tmp"  # Use a writable directory on the server
+MODEL_PATH = os.path.join(MODEL_DIR, "shape_predictor_68_face_landmarks.dat")
+
+def download_dlib_model():
+    """Downloads and decompresses the dlib model if it doesn't exist."""
+    if not os.path.exists(MODEL_PATH):
+        print("Dlib model not found. Downloading...")
+        os.makedirs(MODEL_DIR, exist_ok=True)
+        
+        # Download the compressed file
+        res = requests.get(DLIB_MODEL_URL, stream=True)
+        res.raise_for_status()
+        
+        # Decompress and write to file
+        decompressor = bz2.BZ2Decompressor()
+        with open(MODEL_PATH, "wb") as f:
+            for chunk in res.iter_content(chunk_size=8192):
+                f.write(decompressor.decompress(chunk))
+        print("Model downloaded and decompressed successfully.")
+
+download_dlib_model()
 
 class Entry(Document):
     bookingID=StringField(required=True)
@@ -52,7 +77,7 @@ def image_processing():
 
     try:
         detector = dlib.get_frontal_face_detector()
-        predictor = dlib.shape_predictor("static/shape_predictor_68_face_landmarks.dat")
+        predictor = dlib.shape_predictor(MODEL_PATH)
 
         img_np = np.frombuffer(image_data, np.uint8)
         img_cv2 = cv2.imdecode(img_np, cv2.IMREAD_COLOR)

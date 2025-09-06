@@ -2,7 +2,7 @@
 Flask
 numpy
 mongoengine
-opencv-python
+opencv-python-headless
 dlib
 qrcode[pil]
 pyzbar
