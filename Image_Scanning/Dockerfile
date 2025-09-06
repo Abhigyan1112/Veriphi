@@ -30,4 +30,4 @@ EXPOSE 3000
 # Define the command to run your application
 # Replace 'scanner.py' with your actual file name if it's different.
 # The command tells gunicorn to run the 'app' object from the 'scanner' file.
-CMD ["gunicorn", "--bind", "0.0.0.0:3000", "scanner:app"]
+CMD ["gunicorn", "--bind", "0.0.0.0:3000", "--timeout", "120", "scanner:app"]
