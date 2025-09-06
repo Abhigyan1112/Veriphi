@@ -35,5 +35,5 @@ EXPOSE 3000
 # Define the command to run your application using Gunicorn, a production-grade WSGI server.
 # This is the standard for running Flask apps in production.
 # It binds the server to 0.0.0.0:3000, making it accessible from outside the container.
-CMD ["gunicorn", "--bind", "0.0.0.0:3000", "app:app"]
+CMD ["gunicorn", "--bind", "0.0.0.0:3000", "scanner:app"]
 
