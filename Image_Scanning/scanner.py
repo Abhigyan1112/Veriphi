@@ -48,6 +48,9 @@ def main():
 
 
 
+@app.route("/health")
+def health_check():
+    return jsonify({"status": "ok"}), 200
 
 
 
