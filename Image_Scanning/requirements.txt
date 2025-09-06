@@ -8,3 +8,4 @@ qrcode[pil]
 pyzbar
 gunicorn
 httpx
+Flask-Cors
