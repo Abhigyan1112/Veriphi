@@ -7,3 +7,4 @@ mediapipe
 qrcode[pil]
 pyzbar
 gunicorn
+httpx
