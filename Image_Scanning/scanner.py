@@ -251,9 +251,8 @@ def upload_images():
 @app.route("/qr_generation", methods=['POST'])
 def QR_generation():
     try:
-        data = request.get_json()
-        bookingID = data.get("bookingID")
-        ticketIDs = data.get("ticketIDs") 
+        bookingID = request.form.get("bookingID") 
+        ticketIDs = request.form.getlist("ticketIDs")
 
         if not bookingID or not ticketIDs:
             return jsonify({
