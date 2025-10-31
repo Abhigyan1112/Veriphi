@@ -6,9 +6,8 @@ import io
 import json
 from httpx._multipart import FileField
 from mongoengine import connect, disconnect, Document, StringField, IntField, FileField
-from pymongo import MongoClient
-from bson import json_util
 from flask import redirect, render_template, request, jsonify, get_flashed_messages
+import base64
 import cv2
 import mediapipe as mp
 import qrcode
@@ -43,6 +42,46 @@ class ticketID_person(Document):
     name = StringField(required=True)
     image = FileField(required=True)
     qr = FileField(required=True)
+
+    meta = {'collection': 'ticket_i_d_person'}
+
+    def to_dict_with_files(self):
+        """
+        Custom method to serialize document and encode files to Base64.
+        """
+        image_data = None
+        qr_data = None
+        
+        # Read the image file from GridFS and encode it
+        if self.image:
+            try:
+                # .read() gets the binary data
+                image_binary = self.image.read()
+                # .b64encode() returns bytes, so we .decode('utf-8') to get a string
+                image_data = base64.b64encode(image_binary).decode('utf-8')
+            except Exception as e:
+                print(f"Error reading image for {self.ticketID}: {e}")
+                image_data = None
+
+        # Read the QR file from GridFS and encode it
+        if self.qr:
+            try:
+                qr_binary = self.qr.read()
+                qr_data = base64.b64encode(qr_binary).decode('utf-8')
+            except Exception as e:
+                print(f"Error reading QR for {self.ticketID}: {e}")
+                qr_data = None
+
+        # Return a JSON-friendly dictionary
+        return {
+            "_id": str(self.id),
+            "ticketID": self.ticketID,
+            "bookingID": self.bookingID,
+            "name": self.name,
+            # We add a data URI prefix so it can be used directly in an <img src>
+            "image_base64": f"data:image/png;base64,{image_data}" if image_data else None,
+            "qr_base64": f"data:image/png;base64,{qr_data}" if qr_data else None,
+        }
 
 
 @app.route("/")
@@ -265,38 +304,61 @@ def QR_generation():
                 "message": "bookingID and ticketIDs are required"
             }), 400
 
+        # --- Step 1: Connect to source DB and READ file data into memory ---
         connect(
             db='attendees_images',
             host=mongodb_uri
         )
+        attendees_from_source = list(Entry.objects(bookingID=bookingID))
 
-        attendees_for_bookingID = list(Entry.objects(bookingID=bookingID))
-        disconnect(alias='default')
+        # We MUST read the image data into memory before disconnecting
+        attendee_data_list = []
+        for att in attendees_from_source:
+            image_binary = None
+            try:
+                if att.image:
+                    image_binary = att.image.read() # Read data while connected
+            except Exception as e:
+                print(f"Error reading source image for {att.name}: {e}")
+            
+            attendee_data_list.append({
+                "name": att.name,
+                "image_binary": image_binary # Store the raw bytes
+            })
 
-        # Connect to ticket IDs DB
+        disconnect(alias='default') # Disconnect from 'attendees_images'
+
+        # Check for count mismatch before proceeding
+        if len(attendee_data_list) != len(ticketIDs):
+             return jsonify({
+                "status": "error",
+                "message": f"Data mismatch: Found {len(attendee_data_list)} attendees but received {len(ticketIDs)} ticketIDs."
+            }), 400
+
+        # --- Step 2: Connect to destination DB and WRITE new docs with raw data ---
         connect(
             db='ticket_IDs',
             host=mongodb_uri
         )
 
-        # Pair each attendee with corresponding ticketID
-        for attendee, ticketID in zip(attendees_for_bookingID, ticketIDs):
+        # Pair each attendee's data with the corresponding ticketID
+        for attendee_data, ticketID in zip(attendee_data_list, ticketIDs):
 
             img = qrcode.make(ticketID)
             buffer = io.BytesIO()
             img.save(buffer, format="PNG")
-            buffer.seek(0)
+            buffer.seek(0) # Go to the start of the buffer
 
             ticketID_entry = ticketID_person(
                 ticketID=ticketID,
                 bookingID=bookingID,
-                name=attendee.name,
-                image=attendee.image,
-                qr = buffer.getvalue()
+                name=attendee_data["name"],
+                image=attendee_data["image_binary"], # <-- Use the raw bytes
+                qr = buffer.getvalue() # <-- Use the raw bytes
             )
             ticketID_entry.save()
 
-        disconnect(alias='default')
+        disconnect(alias='default') # Disconnect from 'ticket_IDs'
 
         return jsonify({
             "status": "success",
@@ -315,17 +377,23 @@ def QR_generation():
 @app.route("/get_tickets", methods=['POST'])
 def get_tickets():
     try:
+
+        if "bookingID" not in request.form:
+            return jsonify({
+                "status": "error",
+                "message": "Missing 'bookingID' in form data."
+            }), 400
+        
         connect(
             db='ticket_IDs',
             host=mongodb_uri
         )
         
-        client = MongoClient(mongodb_uri)
-        db = client.ticket_IDs
-        tickets = db.ticket_i_d_person
-        query_filter = {"bookingID" : request.form["bookingID"]}
-        tickets_found = tickets.find(query_filter)
-        tickets_list = json.loads(json_util.dumps(tickets_found))
+        bookingID = request.form["bookingID"]
+
+        query_filter = {"bookingID" : bookingID}
+        found_tickets = ticketID_person.objects(bookingID=bookingID)
+        tickets_list = [ticket.to_dict_with_files() for ticket in found_tickets]
 
         return jsonify({
             "status": "success",
