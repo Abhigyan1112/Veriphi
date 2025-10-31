@@ -3,8 +3,11 @@ from xmlrpc.client import Binary
 from flask import Flask, url_for
 import numpy as np
 import io
+import json
 from httpx._multipart import FileField
 from mongoengine import connect, disconnect, Document, StringField, IntField, FileField
+from pymongo import MongoClient
+from bson import json_util
 from flask import redirect, render_template, request, jsonify, get_flashed_messages
 import cv2
 import mediapipe as mp
@@ -36,6 +39,7 @@ class Entry(Document):
 
 class ticketID_person(Document):
     ticketID = StringField(required=True, unique=True)   # use ticketID instead of bookingID
+    bookingID = StringField(required=True)
     name = StringField(required=True)
     image = FileField(required=True)
     qr = FileField(required=True)
@@ -285,6 +289,7 @@ def QR_generation():
 
             ticketID_entry = ticketID_person(
                 ticketID=ticketID,
+                bookingID=bookingID,
                 name=attendee.name,
                 image=attendee.image,
                 qr = buffer.getvalue()
@@ -298,6 +303,36 @@ def QR_generation():
             "message": f"QR generated for bookingID {bookingID}"
         }), 200
 
+    except Exception as e:
+        return jsonify({
+            "status": "error",
+            "message": str(e)
+        }), 500
+
+
+    
+
+@app.route("/get_tickets", methods=['POST'])
+def get_tickets():
+    try:
+        connect(
+            db='ticket_IDs',
+            host=mongodb_uri
+        )
+        
+        client = MongoClient(mongodb_uri)
+        db = client.ticket_IDs
+        tickets = db.ticket_i_d_person
+        query_filter = {"bookingID" : request.form["bookingID"]}
+        tickets_found = tickets.find(query_filter)
+        tickets_list = json.loads(json_util.dumps(tickets_found))
+
+        return jsonify({
+            "status": "success",
+            "count": len(tickets_list),
+            "tickets": tickets_list
+        }), 200
+        
     except Exception as e:
         return jsonify({
             "status": "error",
