@@ -233,9 +233,10 @@ def upload_images():
         }), 400
 
     try:
-        bookingID = request.form['bookingID']
-        names = request.form.getlist('names')
-        images = request.files.getlist('images')
+        data = request.get_json()
+        bookingID = data['bookingID']
+        names = data['names']
+        images = data.get['images']
     except Exception:
         return jsonify({
             "status": "error",
