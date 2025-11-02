@@ -15,6 +15,8 @@ from pyzbar.pyzbar import decode
 import os 
 from flask_cors import CORS
 import math
+import urllib
+
 
 
 print("--- SERVER RESTARTED WITH CORS ENABLED ---")
@@ -220,63 +222,83 @@ def image_processing():
 # set the Content-Type to multipart/form-data
 @app.route("/upload_images", methods=['POST'])
 def upload_images():
-    #Connecting to the MongoDB database 'attendees_images' with connection string
     try:
-        connect(
-            db='attendees_images',
-            host=mongodb_uri
-        )
+        connect(db='attendees_images', host=mongodb_uri)
     except Exception:
         return jsonify({
+            "status": "error",
+            "message": "Cannot connect to the MongoDB server"
+        }), 400
+
+    try:
+        # ✅ Debug: check what we actually received
+        print("🔍 Received form fields:", list(request.form.keys()))
+        print("🔍 Received files:", list(request.files.keys()))
+
+        # ✅ Try to read metadata as form field first
+        metadata_str = request.form.get('metadata')
+
+        # Fallback: sometimes metadata arrives as a file
+        if not metadata_str and 'metadata' in request.files:
+            metadata_str = request.files['metadata'].read().decode('utf-8')
+
+        # Still missing metadata? Return error
+        if not metadata_str:
+            return jsonify({
                 "status": "error",
-                "message": "Cannot connect to the mongoDB server"
-        }), 400
+                "message": "Missing metadata field"
+            }), 400
 
-    try:
-        bookingID = request.form.get['bookingID']
-        names = request.form.getlist('names')
-        mages = request.files.getlist('images')
-    except Exception:
-        return jsonify({
-            "status": "error",
-            "message": "Missing required fields: bookingID, names, or images"
-        }), 400
+        # ✅ Decode URI-encoded JSON (Flutter encodes it)
+        metadata_str = urllib.parse.unquote(metadata_str)
 
-    if len(names) != len(images):
-        return jsonify({
-            "status": "error",
-            "message": f"Mismatch: Received {len(names)} names and {len(images)} images. They must be equal."
-        }), 400
-        
-    if len(names) == 0:
-        return jsonify({"status": "error", "message": "No names or images received"}), 400
+        # ✅ Parse JSON safely
+        metadata = json.loads(metadata_str)
+        bookingID = metadata.get('bookingID')
+        names = metadata.get('attendees', [])
 
-    saved_entries = []
-    try:
+        if not bookingID or not names:
+            return jsonify({
+                "status": "error",
+                "message": "Missing bookingID or attendees list"
+            }), 400
+
+        # ✅ Get uploaded images
+        images = request.files.getlist('images')
+
+        if len(names) != len(images):
+            return jsonify({
+                "status": "error",
+                "message": f"Mismatch: received {len(names)} names but {len(images)} images"
+            }), 400
+
+        saved_entries = []
         for i, (name, image_file) in enumerate(zip(names, images)):
-            if image_file.filename == '':
-                continue 
+            if not image_file or image_file.filename == '':
+                continue
 
             entry = Entry(
                 bookingID=bookingID,
                 imageID=i + 1,
                 name=name
             )
-            
             entry.image.put(image_file.stream, content_type=image_file.content_type)
             entry.save()
             saved_entries.append(name)
 
         return jsonify({
             "status": "success",
-            "message": f"Successfully uploaded images for {len(saved_entries)} people under bookingID {bookingID}",
+            "message": f"Successfully uploaded {len(saved_entries)} images for bookingID {bookingID}",
             "bookingID": bookingID,
             "names_processed": saved_entries
         }), 201
 
     except Exception as e:
-        print(f"An error occurred during upload: {e}") 
-        return jsonify({"status": "error", "message": str(e)}), 500
+        print(f"Upload error: {e}")
+        return jsonify({
+            "status": "error",
+            "message": str(e)
+        }), 500
 
 
 
