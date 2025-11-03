@@ -436,9 +436,9 @@ def get_tickets():
 
 
 
-@app.route("/resale_tickets", method=['POST'])
-def resale_tickets():
-    try:
+# @app.route("/resale_tickets", method=['POST'])
+# def resale_tickets():
+#     try:
 
 
 if __name__ == '__main__':
