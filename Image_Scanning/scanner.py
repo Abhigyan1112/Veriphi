@@ -330,6 +330,7 @@ def QR_generation():
         connect(
             db='attendees_images',
             host=mongodb_uri
+            alias='source_db'
         )
         attendees_from_source = list(Entry.objects(bookingID=bookingID))
 
@@ -348,7 +349,7 @@ def QR_generation():
                 "image_binary": image_binary # Store the raw bytes
             })
 
-        disconnect(alias='default') # Disconnect from 'attendees_images'
+        disconnect(alias='source_db') # Disconnect from 'attendees_images'
 
         # Check for count mismatch before proceeding
         if len(attendee_data_list) != len(ticketIDs):
@@ -361,6 +362,7 @@ def QR_generation():
         connect(
             db='ticket_IDs',
             host=mongodb_uri
+            alias='destination_db'
         )
 
         # Pair each attendee's data with the corresponding ticketID
@@ -380,7 +382,7 @@ def QR_generation():
             )
             ticketID_entry.save()
 
-        disconnect(alias='default') # Disconnect from 'ticket_IDs'
+        disconnect(alias='destination_db') # Disconnect from 'ticket_IDs'
 
         return jsonify({
             "status": "success",
@@ -428,6 +430,15 @@ def get_tickets():
             "status": "error",
             "message": str(e)
         }), 500
+
+
+
+
+
+
+@app.route("/resale_tickets", method=['POST'])
+def resale_tickets():
+    try:
 
 
 if __name__ == '__main__':
