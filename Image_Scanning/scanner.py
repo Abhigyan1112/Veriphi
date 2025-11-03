@@ -23,7 +23,7 @@ print("--- SERVER RESTARTED WITH CORS ENABLED ---")
 
 app=Flask(__name__)
 CORS(app)
-mongodb_uri = os.environ.get('MONGODB_URI')
+mongodb_uri = "mongodb+srv://Abhigyan1112:veriphi123@verphi.mk8m4jf.mongodb.net/"
 
 face_mesh = mp.solutions.face_mesh.FaceMesh(
     static_image_mode=True,
@@ -95,6 +95,7 @@ def main():
 
 @app.route("/health")
 def health_check():
+    disconnect(alias='default')
     return jsonify({"status": "ok"}), 200
 
 
@@ -348,7 +349,7 @@ def QR_generation():
                 "image_binary": image_binary # Store the raw bytes
             })
 
-        disconnect(alias='source_db') # Disconnect from 'attendees_images'
+        disconnect(alias='default') # Disconnect from 'attendees_images'
 
         # Check for count mismatch before proceeding
         if len(attendee_data_list) != len(ticketIDs):
@@ -380,7 +381,7 @@ def QR_generation():
             )
             ticketID_entry.save()
 
-        disconnect(alias='destination_db') # Disconnect from 'ticket_IDs'
+        disconnect(alias='default') # Disconnect from 'ticket_IDs'
 
         return jsonify({
             "status": "success",
