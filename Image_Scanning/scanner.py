@@ -329,7 +329,7 @@ def QR_generation():
         # --- Step 1: Connect to source DB and READ file data into memory ---
         connect(
             db='attendees_images',
-            host=mongodb_uri
+            host=mongodb_uri,
             alias='source_db'
         )
         attendees_from_source = list(Entry.objects(bookingID=bookingID))
@@ -361,7 +361,7 @@ def QR_generation():
         # --- Step 2: Connect to destination DB and WRITE new docs with raw data ---
         connect(
             db='ticket_IDs',
-            host=mongodb_uri
+            host=mongodb_uri,
             alias='destination_db'
         )
 
