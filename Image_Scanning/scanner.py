@@ -305,6 +305,21 @@ def upload_images():
 
 
 
+@app.route("/connection_check")
+def connection_check():
+    try:
+        connect(db='attendees_images', host=mongodb_uri)
+
+    except Exception:
+        return jsonify({
+            "status": "error",
+            "message": "Cannot connect to the MongoDB server"
+        }), 400
+
+    disconnect(alias='default')
+    return jsonify({"status": "connected and disconnected"}), 200
+
+    
 
 
 
