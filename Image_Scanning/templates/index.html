@@ -1,79 +1,79 @@
 <!DOCTYPE html>
 <html lang="en">
-  <head>
-    <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Camera Capture</title>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/jquery/3.6.0/jquery.min.js"></script>
-    <link
-      rel="stylesheet"
-      href="https://cdnjs.cloudflare.com/ajax/libs/toastr.js/latest/toastr.min.css"
-    />
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/toastr.js/latest/toastr.min.js"></script>
-    <style>
-      video,
-      canvas {
-        border: 1px solid black;
-        margin: 10px;
-      }
-    </style>
-  </head>
-  <body>
-    <h3>Camera Capture</h3>
-    <video id="video" width="320" height="240" autoplay></video>
-    <br />
-    <button id="captureBtn">📸 Capture & Upload</button>
-    <canvas id="canvas" width="320" height="240" style="display: none"></canvas>
 
-    <script>
-      let video = document.getElementById("video");
-      let canvas = document.getElementById("canvas");
-      let context = canvas.getContext("2d");
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Camera Capture</title>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jquery/3.6.0/jquery.min.js"></script>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/toastr.js/latest/toastr.min.css" />
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/toastr.js/latest/toastr.min.js"></script>
+  <style>
+    video,
+    canvas {
+      border: 1px solid black;
+      margin: 10px;
+    }
+  </style>
+</head>
 
-      // ✅ Access camera
-      navigator.mediaDevices
-        .getUserMedia({ video: true })
-        .then((stream) => {
-          video.srcObject = stream;
-        })
-        .catch((err) => {
-          toastr.error("Error accessing camera: " + err);
-        });
+<body>
+  <h3>Camera Capture</h3>
+  <video id="video" width="320" height="240" autoplay></video>
+  <br />
+  <button id="captureBtn">📸 Capture & Upload</button>
+  <canvas id="canvas" width="320" height="240" style="display: none"></canvas>
 
-      // ✅ Capture & Send to Flask
-      document.getElementById("captureBtn").addEventListener("click", () => {
-        context.drawImage(video, 0, 0, canvas.width, canvas.height);
+  <script>
+    let video = document.getElementById("video");
+    let canvas = document.getElementById("canvas");
+    let context = canvas.getContext("2d");
 
-        // Convert canvas to Blob (PNG)
-        canvas.toBlob(function (blob) {
-          let formData = new FormData();
-          formData.append("image", blob, "snapshot.png"); // name = "image"
-
-          // Send to Flask endpoint
-          fetch("http://127.0.0.1:3000/frontal_check", {
-            // 👈 use full URL
-            method: "POST",
-            body: formData,
-          })
-            .then(async (response) => {
-              let data;
-              try {
-                data = await response.json();
-              } catch (e) {
-                throw new Error("Server did not return JSON");
-              }
-
-              if (data.status === "success") {
-                toastr.success(data.message);
-              } else {
-                toastr.error(data.message || "Error processing image");
-              }
-            })
-            .catch((err) => {
-              toastr.error("Upload failed: " + err);
-            });
-        }, "image/png");
+    // ✅ Access camera
+    navigator.mediaDevices
+      .getUserMedia({ video: true })
+      .then((stream) => {
+        video.srcObject = stream;
+      })
+      .catch((err) => {
+        toastr.error("Error accessing camera: " + err);
       });
-    </script>
-  </body>
+
+    // ✅ Capture & Send to Flask
+    document.getElementById("captureBtn").addEventListener("click", () => {
+      context.drawImage(video, 0, 0, canvas.width, canvas.height);
+
+      // Convert canvas to Blob (PNG)
+      canvas.toBlob(function (blob) {
+        let formData = new FormData();
+        formData.append("image", blob, "snapshot.png"); // name = "image"
+
+        // Send to Flask endpoint
+        fetch("http://127.0.0.1:3000/frontal_check", {
+          // 👈 use full URL
+          method: "POST",
+          body: formData,
+        })
+          .then(async (response) => {
+            let data;
+            try {
+              data = await response.json();
+            } catch (e) {
+              throw new Error("Server did not return JSON");
+            }
+
+            if (data.status === "success") {
+              toastr.success(data.message);
+            } else {
+              toastr.error(data.message || "Error processing image");
+            }
+          })
+          .catch((err) => {
+            toastr.error("Upload failed: " + err);
+          });
+      }, "image/png");
+    });
+  </script>
+</body>
+
 </html>

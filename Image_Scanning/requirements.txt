@@ -9,4 +9,5 @@ pyzbar
 gunicorn
 httpx
 Flask-Cors
-gevent 
+gevent
+python-dotenv

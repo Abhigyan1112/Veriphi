@@ -16,6 +16,8 @@ import os
 from flask_cors import CORS
 import math
 import urllib
+from dotenv import load_dotenv
+load_dotenv()
 
 
 
@@ -23,13 +25,18 @@ print("--- SERVER RESTARTED WITH CORS ENABLED ---")
 
 app=Flask(__name__)
 CORS(app)
-mongodb_uri = "mongodb+srv://Abhigyan1112:veriphi123@verphi.mk8m4jf.mongodb.net/"
+mongodb_uri = os.environ.get('MONGODB_URI')
 
-face_mesh = mp.solutions.face_mesh.FaceMesh(
-    static_image_mode=True,
-    max_num_faces=1,
-    min_detection_confidence=0.5
-)
+from mediapipe.tasks import python as mp_python
+from mediapipe.tasks.python import vision
+
+base_options = mp_python.BaseOptions(model_asset_path='face_landmarker.task')
+options = vision.FaceLandmarkerOptions(
+    base_options=base_options,
+    output_face_blendshapes=False,
+    output_facial_transformation_matrixes=False,
+    num_faces=1)
+detector = vision.FaceLandmarker.create_from_options(options)
 
 
 class Entry(Document):
@@ -108,7 +115,7 @@ def image_processing():
     """
     This endpoint checks if an uploaded image contains a single, front-facing human face.
     """
-    global face_mesh # <-- ADD THIS LINE
+    global detector
     if 'image' not in request.files or request.files['image'].filename == '':
         return jsonify({"status": "error", "message": "No file selected"}), 400
 
@@ -129,16 +136,17 @@ def image_processing():
         # Convert the BGR image to RGB (Corrected constant: COLOR_BGR2RGB)
         rgb_image = cv2.cvtColor(img_cv2, cv2.COLOR_BGR2RGB)
         
-        # Process the image with FaceMesh
-        results = face_mesh.process(rgb_image)
+        # Process the image with FaceLandmarker
+        mp_image = mp.Image(image_format=mp.ImageFormat.SRGB, data=rgb_image)
+        detection_result = detector.detect(mp_image)
 
         # Check if any faces were detected
-        if not results.multi_face_landmarks:
+        if not detection_result.face_landmarks:
             return jsonify({"status": "error", "message": "No faces detected."}), 400
         
         # --- Orientation Analysis ---
         # We already set max_num_faces=1, so we can safely take the first result.
-        face_landmarks = results.multi_face_landmarks[0].landmark
+        face_landmarks = detection_result.face_landmarks[0]
         
         # Key landmarks for orientation calculation (using the official MediaPipe landmark map)
         left_eye = face_landmarks[33]      # Left eye outer corner
