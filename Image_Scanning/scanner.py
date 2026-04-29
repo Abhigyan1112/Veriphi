@@ -297,7 +297,7 @@ def upload_images():
             try:
                 disconnect(alias='default')
             except Exception as e:
-                return jsonify({"status": error", "messsage": "could not disconnect to mongodb"}), 500
+                return jsonify({"status": "error", "messsage": "could not disconnect to mongodb"}), 500
 
         return jsonify({
             "status": "success",
