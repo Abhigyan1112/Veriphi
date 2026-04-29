@@ -294,10 +294,7 @@ def upload_images():
             entry.image.put(image_file.stream, content_type=image_file.content_type)
             entry.save()
             saved_entries.append(name)
-            try:
-                disconnect(alias='default')
-            except Exception as e:
-                return jsonify({"status": "error", "messsage": "could not disconnect to mongodb"}), 500
+            disconnect()
 
         return jsonify({
             "status": "success",
